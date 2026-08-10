@@ -248,4 +248,4 @@ This decoupled schema allows backend services, external BMS platforms, or real-t
 * **Missing Video File:** If `go2rtc` fails to start, ensure a valid video file exists at `test_video/sample.mp4`.
 * **Database Logs:** To inspect events recorded in PostgreSQL directly from your host terminal:
   ```bash
-  docker exec -it poc_postgres psql -U admin -d facility_events -c "SELECT * FROM facility_events;"
+  docker exec -it postgres psql -U admin -d facility_events -c "SELECT * FROM facility_events;"
