@@ -1,0 +1,105 @@
+graph LR
+    %% Styling
+    classDef device fill:#e8f4f8,stroke:#2b7b9b,stroke-width:2px;
+    classDef ingest fill:#fcf3cf,stroke:#b7950b,stroke-width:2px;
+    classDef broker fill:#f5eef8,stroke:#7d3c98,stroke-width:2px;
+    classDef ai fill:#fadbd8,stroke:#b03a2e,stroke-width:2px;
+    classDef storage fill:#e8daef,stroke:#6c3483,stroke-width:2px;
+    classDef core fill:#d4efdf,stroke:#1e8449,stroke-width:2px;
+    classDef plg fill:#d5dbdb,stroke:#5d6d7e,stroke-width:2px;
+    classDef external fill:#edbb99,stroke:#a04000,stroke-width:2px;
+    classDef ui fill:#d6eaf8,stroke:#2874a6,stroke-width:2px;
+
+    %% 1. Edge/Hardware
+    subgraph Edge [Edge & Devices]
+        CAM[CCTV IP Cameras]:::device
+    end
+
+    %% 2. Ingestion & Proxy
+    subgraph Ingestion [1. Video Ingestion & Gateway]
+        GO2RTC[go2rtc<br/>Video Media Gateway]:::ingest
+        VID_SVC[Ingestion Service<br/>Strategy Pattern: ONVIF/RTSP]:::ingest
+    end
+
+    %% 3. Event Bus
+    subgraph EventBus [2. Message Broker]
+        RABBIT[RabbitMQ / Redis Streams<br/>Task Queues & Routing]:::broker
+        DLQ[Dead Letter Queue<br/>Failed Frame Isolation]:::broker
+    end
+
+    %% 4. AI Pipeline
+    subgraph AILayer [3. Distributed AI Vision]
+        AI_OBJ[Object Detection Workers<br/>YOLO: Fire, PPE, Occupancy]:::ai
+        AI_SCENE[Scene Analysis Workers<br/>SSIM: Cleanliness, Furniture]:::ai
+    end
+
+    %% 5. Storage
+    subgraph StorageLayer [4. Storage & Cache]
+        PG[(PostgreSQL<br/>Audit, Rules, Metadata)]:::storage
+        REDIS[(Redis Cache<br/>State & Config Cache)]:::storage
+        MINIO[(MinIO Object Storage<br/>Images, Baselines)]:::storage
+    end
+
+    %% 6. Backend
+    subgraph CoreBackend [5. Decision Engine & Gateway]
+        PROXY[Reverse Proxy / Gateway<br/>Nginx / Traefik]:::core
+        FASTAPI[FastAPI Backend API]:::core
+        SCHEDULER[SLA & Background Engine<br/>Celery / APScheduler]:::core
+    end
+
+    %% 7. Telemetry
+    subgraph Observability [6. Telemetry]
+        PLG[PLG Stack / Mimir<br/>Prometheus, Loki, Grafana]:::plg
+    end
+
+    %% 8. External Integrations
+    subgraph ExtSys [7. External Systems & Alerts]
+        BMS[BMS & IoT Controllers]:::external
+        AC[Access Control Systems]:::external
+        NOTIF[Notification Gateway<br/>Push, SMS, Email]:::external
+    end
+    
+    %% 9. UI
+    subgraph Frontend [8. User Interface]
+        UI[React / Flutter Dashboard]:::ui
+    end
+
+    %% Routing
+    CAM -- "Raw RTSP" --> GO2RTC
+    CAM -- "ONVIF Telemetry / PTZ" --> VID_SVC
+    
+    GO2RTC -- "RTSP Restream" --> VID_SVC
+    
+    VID_SVC -- "Publish Frame Metadata" --> RABBIT
+    RABBIT -. "Failed Message Routing" .-> DLQ
+    
+    RABBIT -- "Work Queue (Load Balanced)" --> AI_OBJ
+    RABBIT -- "Work Queue (Load Balanced)" --> AI_SCENE
+    
+    AI_OBJ -. "Check Cached Rules" .-> REDIS
+    AI_SCENE -. "Fetch Ref Baselines" .-> MINIO
+    
+    AI_OBJ -- "JSON Detections" --> RABBIT
+    AI_SCENE -- "JSON Scoring" --> RABBIT
+    
+    RABBIT -- "Event Subscriptions" --> FASTAPI
+    
+    FASTAPI <--> REDIS
+    FASTAPI <--> PG
+    FASTAPI -- "Save Snapshots" --> MINIO
+    
+    SCHEDULER -- "Check SLA Escalations" --> PG
+    SCHEDULER -- "Dispatch Escalations" --> NOTIF
+    
+    UI -- "HTTPS / WSS" --> PROXY
+    PROXY -- "API Traffic" --> FASTAPI
+    PROXY -- "WebRTC Stream Routing" --> GO2RTC
+    
+    FASTAPI -- "REST / MQTT Triggers" --> BMS
+    FASTAPI -- "Webhook Triggers" --> AC
+    FASTAPI -- "Personnel Alerts" --> NOTIF
+
+    %% Telemetry
+    GO2RTC -. "/metrics" .-> PLG
+    FASTAPI -. "/metrics" .-> PLG
+    AI_OBJ -. "GPU & VRAM Stats" .-> PLG

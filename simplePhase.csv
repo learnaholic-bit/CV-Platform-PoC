@@ -1,0 +1,7 @@
+Component,Phase 1: Core MVP (Must Have),Phase 2: System Scale (Should Have),Phase 3: Enterprise Polish (Nice to Have)
+Media Handling,go2rtc (Video proxy & WebRTC),ONVIF Strategy Pattern,Hardware PTZ integration
+Message Bus,RabbitMQ (Single queue),RabbitMQ + Dead Letter Queue,Redis Streams
+AI Inference,1 Object Detection Worker (YOLO for occupancy/PPE/fire),1 Scene Worker (SSIM for cleanliness),Cascading multi-model pipeline
+Backend API,FastAPI + WebSockets,FastAPI + Celery (SLA Engine),API Gateway / Nginx
+Storage & Cache,PostgreSQL (Relational + Local File Storage),MinIO (Object Storage),Redis (In-memory Caching)
+Observability,FastAPI Console Logs + Standard Docker Logs,Prometheus + Grafana (Core Metrics),Full PLG Stack (Loki + Mimir)

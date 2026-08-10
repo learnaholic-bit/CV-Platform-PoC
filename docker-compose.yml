@@ -1,0 +1,87 @@
+services:
+  # 1. Media Gateway
+# 1. Media Gateway
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    ports:
+      - "1984:1984" # API & Web UI
+      - "8554:8554" # RTSP
+      - "8555:8555/tcp" # WebRTC
+      - "8555:8555/udp" # WebRTC
+    volumes:
+      - ./test_video/sample.mp4:/config/sample.mp4
+      - ./config/go2rtc.yaml:/config/go2rtc.yaml
+    restart: unless-stopped
+
+  # 2. Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # 3. Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: facility_events
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./config/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d facility_events"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # 4. Backend (FastAPI)
+  backend:
+    build: ./backend
+    container_name: backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://admin:password123@postgres:5432/facility_events
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    volumes:
+      - ./backend:/app/src  # Live code reloading
+      - ./media:/app/media  # Shared media storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # 5. Mock AI / Ingestion Worker
+  ai_worker:
+    build: ./ai_worker
+    container_name: ai_worker
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RTSP_STREAM_URL=rtsp://go2rtc:8554/test_cam
+    volumes:
+      - ./ai_worker:/app/src
+      - ./media:/app/media  # Shared media storage
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      go2rtc:
+        condition: service_started
+
+volumes:
+  pg_data:

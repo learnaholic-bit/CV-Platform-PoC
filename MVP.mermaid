@@ -1,0 +1,72 @@
+graph LR
+    %% Styling
+    classDef device fill:#e8f4f8,stroke:#2b7b9b,stroke-width:2px;
+    classDef ingest fill:#fcf3cf,stroke:#b7950b,stroke-width:2px;
+    classDef broker fill:#f5eef8,stroke:#7d3c98,stroke-width:2px;
+    classDef ai fill:#fadbd8,stroke:#b03a2e,stroke-width:2px;
+    classDef storage fill:#e8daef,stroke:#6c3483,stroke-width:2px;
+    classDef core fill:#d4efdf,stroke:#1e8449,stroke-width:2px;
+    classDef ui fill:#d6eaf8,stroke:#2874a6,stroke-width:2px;
+
+    %% 1. Video Source
+    subgraph VideoSource [Video Source]
+        CAM[CCTV Camera / RTSP Test Feed]:::device
+    end
+
+    %% 2. Ingestion & Proxy
+    subgraph MediaIngestion [1. Media Proxy & Ingestion]
+        GO2RTC[go2rtc Container<br/>WebRTC / RTSP Proxy]:::ingest
+        INGEST_SVC[Frame Sampler Service<br/>Python / OpenCV]:::ingest
+    end
+
+    %% 3. Message Broker
+    subgraph EventBroker [2. Task Queue]
+        RABBIT[RabbitMQ Container<br/>Message Broker]:::broker
+    end
+
+    %% 4. AI Pipeline
+    subgraph AIWorkers [3. Core AI Models]
+        AI_YOLO[YOLOv8 Worker Container<br/>Occupancy & Fire Detection]:::ai
+        AI_SSIM[OpenCV Worker Container<br/>SSIM Scene & Cleanliness]:::ai
+    end
+
+    %% 5. Storage
+    subgraph MVPStorage [4. Data & Image Storage]
+        PG[(PostgreSQL Container<br/>Events, Rules, Logs)]:::storage
+        LOCAL_DISK[(Local Media Volume<br/>/app/media Snapshots)]:::storage
+    end
+
+    %% 6. Backend
+    subgraph BackendCore [5. Core Application API]
+        FASTAPI[FastAPI Backend Container<br/>Rules Engine & WebSockets]:::core
+    end
+
+    %% 7. Frontend
+    subgraph ClientDashboard [6. User Interface]
+        UI[React Dashboard<br/>Single Page App]:::ui
+    end
+
+    %% Routing
+    CAM -- "Raw RTSP Stream" --> GO2RTC
+    
+    GO2RTC -- "RTSP Restream" --> INGEST_SVC
+    GO2RTC -- "WebRTC Low-Latency Stream" --> UI
+    
+    INGEST_SVC -- "Save Raw Frame" --> LOCAL_DISK
+    INGEST_SVC -- "Publish Frame Metadata" --> RABBIT
+    
+    RABBIT -- "Work Queue: Detection Tasks" --> AI_YOLO
+    RABBIT -- "Work Queue: Scene Tasks" --> AI_SSIM
+    
+    AI_SSIM -. "Fetch Baseline Image" .-> LOCAL_DISK
+    
+    AI_YOLO -- "JSON Detection Payload" --> RABBIT
+    AI_SSIM -- "JSON Scoring Payload" --> RABBIT
+    
+    RABBIT -- "Event Consumption" --> FASTAPI
+    
+    FASTAPI -- "Read/Write Logs & Rules" --> PG
+    FASTAPI -- "Read/Write Event Snapshots" --> LOCAL_DISK
+    
+    FASTAPI -- "REST API Data" --> UI
+    FASTAPI -- "WebSockets Real-Time Alerts" --> UI
