@@ -9,7 +9,11 @@ This initial build focuses entirely on **infrastructure resilience, data decoupl
 Please feel free to reuse, fork, or adapt this architecture for enterprise facility management pipelines.
 
 ---
+## Demo
 
+https://github.com/user-attachments/assets/1c424474-a43a-470e-a051-d2f6675f5a24
+
+---
 ## The "Why": Architecture & DevOps Strategy
 Processing multiple live video feeds through deep learning models (like YOLO) is computationally heavy. A standard monolithic application would quickly suffer from buffering, dropped frames, and memory leaks. This architecture solves those physical constraints through three core principles:
 
